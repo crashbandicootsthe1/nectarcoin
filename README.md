@@ -1,4 +1,4 @@
-NECTARCOIN
+**NECTARCOIN**
 
 a currency for Scratch
 
