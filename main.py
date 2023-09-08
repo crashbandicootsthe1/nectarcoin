@@ -1,20 +1,41 @@
 import datetime
 import json
 import os
+import websocket
 
-os.system ("pip install --upgrade -U scratchattach")
-os.environ["SESSION_ID"] = ".eJxVUEFugzAQ_IvPKcUG2yS39NYcWqk55YQWewEXsCMwikrVv3ctccltNTszO7O_bF1w9jAhOzEzw9I34K0zIcQl9sjZgdWwxr5OtNpZYlVca13kilYRl0jUwSX1I8wD2mdBA2ZAn1QJQx-dgeiCz_bFkn3hfdzBt51MvoEGEukS4JhX1mgNpebtUQkpihIbaKRG254ul6516vwj9Hbb8m0b5HKdts93uBqyGUPn_Iu7k5PM-FFmZSZKmRKO4LsVuhSbDh2Y_SYg1NFNuAWf4POEM-V6_cBHfaNmz716elQq1WqlykoZLcAKibYphMyNBbAV8gqAS1CWW_b3D9sbdrQ:1q0vnp:o8KgDTfwAwj2jKhTuU40ceVp5fk"
-import scratchattach as scratch3
+os.system ("pip install websocket-client")
+# Define the Scratch project WebSocket URL and project ID
+SCRATCH_WS_URL = "wss://clouddata.scratch.mit.edu"
+PROJECT_ID = "854753637"  # Replace with your project ID
 
-session = scratch3.Session(os.environ["SESSION_ID"], username="crashbandicootsthe1")
-conn = session.connect_cloud("854753637")
+# Create a WebSocket connection to the Scratch project
+ws = websocket.WebSocketApp(f"{SCRATCH_WS_URL}/?projectid={PROJECT_ID}")
 
-client = scratch3.CloudRequests(conn)
+def on_open(ws):
+    print("WebSocket connected")
 
-@client.request
-def connect():
-  linked_user = session.get_linked_user()
-  return linked_user
+def on_message(ws, message):
+    try:
+        message_data = json.loads(message)
+        if message_data.get("method") == "set":
+            handle_scratch_data(message_data)
+    except json.JSONDecodeError:
+        pass
+
+def send_data_to_scratch(data):
+    # Create a message to set the cloud variable
+    message_data = {
+        "method": "set",
+        "name": "Return",  # Replace with your cloud variable name
+        "value": data,          # The data you want to send from Python
+    }
+    ws.send(json.dumps(message_data))
+
+ws.on_open = on_open
+ws.on_message = on_message
+
+# Start the WebSocket connection
+ws.run_forever()
 
 
 @client.request
