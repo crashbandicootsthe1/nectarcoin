@@ -1,166 +1,91 @@
 import datetime
+import random
 import json
 import os
-import websocket
 
-os.system ("pip install websocket-client")
-# Define the Scratch project WebSocket URL and project ID
-SCRATCH_WS_URL = "wss://clouddata.scratch.mit.edu"
-PROJECT_ID = "854753637"  # Replace with your project ID
+import scratchattach as scratch3
 
-# Create a WebSocket connection to the Scratch project
-ws = websocket.WebSocketApp(f"{SCRATCH_WS_URL}/?projectid={PROJECT_ID}")
+# Your username and session setup
+username = "crashbandicootsthe1"
+session = scratch3.Session(os.environ["SESSION_ID"], username=username)
+conn = session.connect_cloud("854753637")
+client = scratch3.CloudRequests(conn)
 
-def on_open(ws):
-    print("WebSocket connected")
+REQUESTS_PER_MINUTE = 30
+MINUTE_IN_SECONDS = 60
 
-def on_message(ws, message):
-    try:
-        message_data = json.loads(message)
-        if message_data.get("method") == "set":
-            handle_scratch_data(message_data)
-    except json.JSONDecodeError:
-        pass
+# Initialize last_request_time
+last_request_time = datetime.datetime.now()
 
-def send_data_to_scratch(data):
-    # Create a message to set the cloud variable
-    message_data = {
-        "method": "set",
-        "name": "Return",  # Replace with your cloud variable name
-        "value": data,          # The data you want to send from Python
-    }
-    ws.send(json.dumps(message_data))
-
-ws.on_open = on_open
-ws.on_message = on_message
-
-# Start the WebSocket connection
-ws.run_forever()
-
-
-@client.request
-def ping():
-    print ("ping recieved")
-    return "pong" # Return a response
-
-
+# Initialize user_data dictionary
+user_data = {}
 
 # Function to load user data from a JSON file
 def load_user_data():
-    if os.path.exists('user_data.json'):
-        try:
-            with open('user_data.json', 'r') as file:
-                return json.load(file)
-        except json.JSONDecodeError as e:
-            print(f"Error decoding JSON: {e}")
-            return {}
-            return session.get_linked_user
-            return balance
-    else:
-        return {}
+    global user_data
+    if os.path.exists("user_data.json"):
+        with open("user_data.json", "r") as data_file:
+            user_data = json.load(data_file)
 
 # Function to save user data to a JSON file
-def save_user_data(user_data):
-    with open('user_data.json', 'w') as file:
-        json.dump(user_data, file, indent=4)
+def save_user_data():
+    with open("user_data.json", "w") as data_file:
+        json.dump(user_data, data_file, indent=4)
 
-# Function to add Nectarcoin to a user's account and update user data
-# Function to add Nectarcoin to a user's account and update user data
-def add_nectarcoin(user_data, linked_user, amount):
-    if linked_user in user_data:
-        user_data[username]['nectarcoin'] += amount
-    else:
-        user_data[username] = {'nectarcoin': amount, 'last_claim_date': datetime.date.today().isoformat()}  # Start with 150 Nectarcoin
-
-# Rest of your code...
-
-
-# Function to claim daily Nectarcoin and update user data
-def claim_daily_nectarcoin(user_data, username):
-    today = datetime.date.today()
+# Function to check the Nectarcoin balance
+@client.request
+def check_balance(username):
     if username in user_data:
-        last_claim_date = user_data[username].get('last_claim_date')
-        if last_claim_date != today.isoformat():
-            user_data[username]['nectarcoin'] += 15
-            user_data[username]['last_claim_date'] = today.isoformat()
-            save_user_data(user_data)  # Save the updated user_data to the JSON file
+        return user_data[username]['nectarcoin_balance']
     else:
-        # Add the missing user to the database with an initial balance of 150 and today's date
-        user_data[username] = {'nectarcoin': 150, 'last_claim_date': today.isoformat()}  # Start with 150 Nectarcoin
-        save_user_data(user_data)  # Save the updated user_data to the JSON file
+        # Initialize user with 150 Nectarcoins and today's date
+        user_data[username] = {
+            'nectarcoin_balance': 150,
+            'last_claim_date': datetime.datetime.now().strftime("%Y-%m-%d")
+        }
+        save_user_data()
+        return 150  # Return the initial balance
 
-# Rest of your code...
+# Function to claim daily Nectarcoin
+@client.request
+def claim_daily_nectarcoin(username):
+    global last_request_time
+    current_time = datetime.datetime.now()
+    time_since_last_request = current_time - last_request_time
 
+    if time_since_last_request.total_seconds() < MINUTE_IN_SECONDS / REQUESTS_PER_MINUTE:
+        return "Too many requests. Please try again later."
 
-# Function to check Nectarcoin balance
-def check_balance(user_data, username):
-    if username in user_data:
-        return user_data[username]['nectarcoin']
-    else:
-        # Add the missing user to the database with an initial balance of 150
-        today = datetime.date.today()
-        user_data[username] = {'nectarcoin': 150, 'last_claim_date': today.isoformat()}
-        save_user_data(user_data)  # Save the updated user_data to the JSON file
-        return 150  # Return 150 as the initial balance for the missing user
+    last_request_time = current_time
 
-# ... (previous code)
+    linked_user_info = get_linked_username(username)
+    linked_username = linked_user_info.get("linked_username")
 
-# Function to establish a connection
-
-
-# ... (previous code)
-
-# Main program
-if __name__ == "__main__":
-    user_data = load_user_data()
-
-    while True:
-        print("Nectarcoin Menu:")
-        print("1. Check Balance")
-        print("2. Claim Daily Nectarcoin")
-        print("3. Send Nectarcoin")
-        print("4. Connect")
-        print("5. Exit")
-        
-        choice = input("Enter your choice: ")
-        
-        if choice == "1":
-            username = input("Enter your username: ")
-            balance = check_balance(user_data, username)
-            print(f"Your Nectarcoin balance: {balance}")
-        
-        elif choice == "2":
-            username = input("Enter your username: ")
-            claim_daily_nectarcoin(user_data, username)
-            print("You have claimed 15 Nectarcoin for today.")
-        
-        elif choice == "3":
-            sender = input("Enter your username (sender): ")
-            receiver = input("Enter receiver's username: ")
-            amount = int(input("Enter the amount to send: "))
-            
-            if sender in user_data and user_data[sender]['nectarcoin'] >= amount:
-                add_nectarcoin(user_data, receiver, amount)
-                user_data[sender]['nectarcoin'] -= amount
-                print(f"{amount} Nectarcoin sent to {receiver}.")
+    if linked_username is not None:
+        if linked_username in user_data:
+            last_claim_date = datetime.datetime.strptime(user_data[linked_username]["last_claim_date"], "%Y-%m-%d")
+            if current_time.date() > last_claim_date.date():
+                user_data[linked_username]["nectarcoin_balance"] += 15
+                user_data[linked_username]["last_claim_date"] = current_time.strftime("%Y-%m-%d")
+                save_user_data()
+                return f"You claimed 15 Nectarcoins for {linked_username} today!"
             else:
-                print("Insufficient funds.")
-        
-        elif choice == "4":
-            try:
-                connect()
-                
-                print("Connection established.")
-            except Exception as e:
-                print(f"Failed to connect: {e}")
-        
-        elif choice == "5":
-            save_user_data(user_data)
-            print("Exiting Nectarcoin.")
-            break
-        
+                return f"You have already claimed Nectarcoins today for {linked_username}."
         else:
-            print("Invalid choice. Please try again.")
+            return f"User '{linked_username}' not found in user_data."
+    else:
+        return "No linked user found."
 
+# Function to get linked username
+@client.request
+def get_linked_username(username):
+    linked_username = username  # Replace this with your implementation to get the linked username
+    return {"linked_username": linked_username}
 
-client.run()
+@client.event
+def on_request(request):
+    print("Received request", request.name, request.requester, request.arguments, request.timestamp, request.id)
+
+if __name__ == "__main__":
+    load_user_data()
+    client.run()
